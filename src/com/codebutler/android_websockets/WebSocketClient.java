@@ -154,7 +154,7 @@ public class WebSocketClient {
                         mSocket.close();
                         mSocket = null;
                         mConnected = false;
-                    } catch (IOException ex) {
+                    } catch (Exception ex) {
                         Log.d(TAG, "Error while disconnecting", ex);
                         mListener.onError(ex);
                     }
