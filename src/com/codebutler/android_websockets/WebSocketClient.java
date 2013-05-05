@@ -69,7 +69,7 @@ public class WebSocketClient {
         return mListener;
     }
 
-    public void connect() {
+    public synchronized void connect() {
         if (mThread != null && mThread.isAlive()) {
             return;
         }
@@ -136,13 +136,13 @@ public class WebSocketClient {
                 } catch (EOFException ex) {
                     Log.d(TAG, "WebSocket EOF!", ex);
                     mListener.onDisconnect(0, "EOF");
-                    mConnected.set(false);
+                    abort();
 
                 } catch (SSLException ex) {
                     // Connection reset by peer
                     Log.d(TAG, "Websocket SSL error!", ex);
                     mListener.onDisconnect(0, "SSL");
-                    mConnected.set(false);
+                    abort();
 
                 } catch (Exception ex) {
                     mListener.onError(ex);
@@ -151,6 +151,22 @@ public class WebSocketClient {
         });
         mThread.start();
     }
+    
+    private void abort() {
+
+        if(mConnected.compareAndSet(false, false)) {
+        	return;
+        }
+        
+        if(mSocket != null) {
+	        try {
+				mSocket.close();
+			} catch (IOException ex) {
+                Log.d(TAG, "Error aborting!", ex);
+			}
+	        mSocket = null;
+        }
+    }
 
     public void disconnect() {
         if (mSocket != null) {
@@ -158,7 +174,7 @@ public class WebSocketClient {
                 @Override
                 public void run() {
                     try {
-                        if(mConnected.getAndSet(false) == false) {
+                        if(mConnected.compareAndSet(false, false)) {
                         	return;
                         }
                         
