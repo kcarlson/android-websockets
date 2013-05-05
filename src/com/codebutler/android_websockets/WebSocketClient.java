@@ -1,20 +1,5 @@
 package com.codebutler.android_websockets;
 
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.text.TextUtils;
-import android.util.Base64;
-import android.util.Log;
-import org.apache.http.*;
-import org.apache.http.client.HttpResponseException;
-import org.apache.http.message.BasicLineParser;
-import org.apache.http.message.BasicNameValuePair;
-
-import javax.net.SocketFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLException;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,6 +9,28 @@ import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.net.SocketFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+
+import org.apache.http.Header;
+import org.apache.http.HttpException;
+import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.StatusLine;
+import org.apache.http.client.HttpResponseException;
+import org.apache.http.message.BasicLineParser;
+import org.apache.http.message.BasicNameValuePair;
+
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.text.TextUtils;
+import android.util.Base64;
+import android.util.Log;
 
 public class WebSocketClient {
     private static final String TAG = "WebSocketClient";
@@ -36,7 +43,7 @@ public class WebSocketClient {
     private Handler                  mHandler;
     private List<BasicNameValuePair> mExtraHeaders;
     private HybiParser               mParser;
-    private boolean                  mConnected;
+    private AtomicBoolean         	mConnected;
 
     private final Object mSendLock = new Object();
 
@@ -50,7 +57,7 @@ public class WebSocketClient {
         mURI          = uri;
         mListener     = listener;
         mExtraHeaders = extraHeaders;
-        mConnected    = false;
+        mConnected    = new AtomicBoolean();
         mParser       = new HybiParser(this);
 
         mHandlerThread = new HandlerThread("websocket-thread");
@@ -121,7 +128,7 @@ public class WebSocketClient {
 
                     mListener.onConnect();
 
-                    mConnected = true;
+                    mConnected.set(true);
 
                     // Now decode websocket frames.
                     mParser.start(stream);
@@ -129,13 +136,13 @@ public class WebSocketClient {
                 } catch (EOFException ex) {
                     Log.d(TAG, "WebSocket EOF!", ex);
                     mListener.onDisconnect(0, "EOF");
-                    mConnected = false;
+                    mConnected.set(false);
 
                 } catch (SSLException ex) {
                     // Connection reset by peer
                     Log.d(TAG, "Websocket SSL error!", ex);
                     mListener.onDisconnect(0, "SSL");
-                    mConnected = false;
+                    mConnected.set(false);
 
                 } catch (Exception ex) {
                     mListener.onError(ex);
@@ -151,9 +158,12 @@ public class WebSocketClient {
                 @Override
                 public void run() {
                     try {
+                        if(mConnected.getAndSet(false) == false) {
+                        	return;
+                        }
+                        
                         mSocket.close();
                         mSocket = null;
-                        mConnected = false;
                     } catch (Exception ex) {
                         Log.d(TAG, "Error while disconnecting", ex);
                         mListener.onError(ex);
@@ -172,7 +182,7 @@ public class WebSocketClient {
     }
 
     public boolean isConnected() {
-        return mConnected;
+        return mConnected.get();
     }
 
     private StatusLine parseStatusLine(String line) {
