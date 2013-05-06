@@ -154,7 +154,7 @@ public class WebSocketClient {
     
     private void abort() {
 
-        if(mConnected.compareAndSet(false, false)) {
+        if(!mConnected.getAndSet(false)) {
         	return;
         }
         
@@ -174,7 +174,7 @@ public class WebSocketClient {
                 @Override
                 public void run() {
                     try {
-                        if(mConnected.compareAndSet(false, false)) {
+                        if(!mConnected.getAndSet(false)) {
                         	return;
                         }
                         
